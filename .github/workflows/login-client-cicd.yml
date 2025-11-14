@@ -1,0 +1,42 @@
+name: login-client | Build & Deploy to Azure
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "login-client/**"
+      - ".github/workflows/login-client-cicd.yml"
+  workflow_dispatch:
+
+env:
+  RESOURCE_GROUP: rg-salud-ips
+  WEBAPP_NAME: web-login-client-salud-ips
+  ACR_NAME: acrsaludipsobri
+  IMAGE_NAME: login-client:1.0.0
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔐 Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: 🐳 Build image in ACR (login-client)
+        run: |
+          az acr build \
+            --registry $ACR_NAME \
+            --image $IMAGE_NAME \
+            --file login-client/Dockerfile \
+            login-client
+
+      - name: 🔁 Restart Web App
+        run: |
+          az webapp restart \
+            --resource-group $RESOURCE_GROUP \
+            --name $WEBAPP_NAME
