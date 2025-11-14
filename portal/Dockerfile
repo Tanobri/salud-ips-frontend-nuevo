@@ -1,9 +1,13 @@
 # ---------- Build ----------
 FROM node:20-alpine AS build
 WORKDIR /app
-COPY package*.json ./
+
+# 👇 OJO: ahora copiamos desde la carpeta portal del repo
+COPY portal/package*.json ./
 RUN npm ci
-COPY . .
+
+# 👇 Y después copiamos todo el código del frontend desde portal/
+COPY portal/ ./
 RUN npm run build
 
 # ---------- Runtime ----------
