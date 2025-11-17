@@ -34,7 +34,8 @@ jobs:
             --registry $ACR_NAME \
             --image $IMAGE_NAME \
             --file portal/Dockerfile \
-            portal
+            .
+
 
       # Reinicia el Web App del portal para que tome la nueva imagen
       - name: 🔁 Restart Web App (portal)
