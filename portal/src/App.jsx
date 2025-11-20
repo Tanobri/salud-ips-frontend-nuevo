@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
 import './App.css';
 
-// URL base del servicio de citas en Azure
-const CITAS_API_BASE =
-  'https://citas-api-cloud-gtadg0fycqhqf6hk.canadacentral-01.azurewebsites.net';
-
-// URL base del servicio de notas (SOAP) en Azure
-const NOTAS_API_BASE =
-  'https://notas-api-cloud-evhxddgkdfbfdngr.canadacentral-01.azurewebsites.net';
+// ===============================
+//  API Gateway (API Management)
+// ===============================
+// Toda la comunicación del portal va a pasar por el API Gateway
+// Ajusta esta URL solo si cambias el dominio del APIM.
+const API_BASE = 'https://apigatewaysaludobri.azure-api.net';
 
 function App() {
   const [token, setToken] = useState('');
@@ -21,7 +20,7 @@ function App() {
   const [createMsg, setCreateMsg] = useState('');
   const [createdCita, setCreatedCita] = useState(null);
 
-  // ==== Estados del formulario de creación de nota SOAP ====
+  // ==== Estados del formulario de nota SOAP ====
   const [citaIdNota, setCitaIdNota] = useState('');
   const [S, setS] = useState('');
   const [O, setO] = useState('');
@@ -31,39 +30,39 @@ function App() {
   const [createNotaMsg, setCreateNotaMsg] = useState('');
   const [createdNota, setCreatedNota] = useState(null);
 
+  // ================================
+  //  Manejo del token (URL + localStorage)
+  // ================================
   useEffect(() => {
-    // 1) Intentamos leer el token desde la URL (?token=...)
-    const params = new URLSearchParams(window.location.search);
-    const fromQuery = params.get('token');
+    const url = new URL(window.location.href);
+    const fromQuery = url.searchParams.get('token');
 
     if (fromQuery) {
+      // 1) Token recibido desde el login via ?token=
       setToken(fromQuery);
+      setStatus('🔓 Token recibido desde el login y almacenado.');
       localStorage.setItem('portalAccessToken', fromQuery);
-      setStatus(
-        '✅ Token recibido desde el login. El portal ya puede usar las APIs protegidas.'
-      );
 
-      // Limpiamos la URL para que no quede el token visible
-      const url = new URL(window.location.href);
+      // 2) Limpiar la URL para que no quede el token visible
       url.searchParams.delete('token');
       window.history.replaceState({}, '', url.toString());
     } else {
-      // 2) Si no hay token en la URL, revisamos si hay uno guardado en este dominio
+      // 3) Intentar cargar token desde localStorage
       const stored = localStorage.getItem('portalAccessToken');
       if (stored) {
         setToken(stored);
-        setStatus(
-          'ℹ️ Usando el token guardado previamente en este navegador.'
-        );
+        setStatus('🔐 Token cargado desde el almacenamiento local.');
       } else {
         setStatus(
-          '⚠️ No se encontró token. Inicia sesión primero en el login para entrar con un token válido.'
+          '⚠️ No se encontró token. Inicia sesión primero en el login y deja que te redirija al portal.'
         );
       }
     }
   }, []);
 
-  // ==== Crear CITA ====
+  // ==========================
+  //  Crear CITA
+  // ==========================
   async function handleCrearCita(e) {
     e.preventDefault();
     setCreateMsg('');
@@ -71,13 +70,13 @@ function App() {
 
     if (!token) {
       setCreateMsg(
-        '❌ No hay token disponible. Debes iniciar sesión en el login primero.'
+        '⚠️ No hay token disponible. Debes iniciar sesión en el login para obtenerlo.'
       );
       return;
     }
 
     if (!medicoId || !fechaHora || !motivo) {
-      setCreateMsg('⚠️ Todos los campos de la cita son obligatorios.');
+      setCreateMsg('⚠️ Debes llenar todos los campos de la cita.');
       return;
     }
 
@@ -85,7 +84,8 @@ function App() {
     try {
       const fechaISO = new Date(fechaHora).toISOString();
 
-      const resp = await fetch(`${CITAS_API_BASE}/citas`, {
+      // 👉 Ahora usamos el API GATEWAY: POST /citas
+      const resp = await fetch(`${API_BASE}/citas`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -98,37 +98,37 @@ function App() {
         }),
       });
 
-      const data = await resp.json();
-
       if (!resp.ok) {
+        const txt = await resp.text();
         setCreateMsg(
-          `❌ Error al crear la cita: ${
-            data?.message || `HTTP ${resp.status}`
-          }`
+          `❌ Error al crear la cita (HTTP ${resp.status}): ${txt}`
         );
         return;
       }
 
-      setCreateMsg('✅ Cita creada correctamente.');
+      const data = await resp.json();
       setCreatedCita(data);
+      setCreateMsg('✅ Cita creada correctamente a través del API Gateway.');
 
-      // Rellenamos automáticamente el campo de cita para la nota
+      // Si la API devuelve un id, lo usamos para prellenar la nota
       if (data.id) {
-        setCitaIdNota(data.id);
+        setCitaIdNota(String(data.id));
       }
     } catch (err) {
+      console.error(err);
       setCreateMsg(
         `❌ Error inesperado al crear la cita: ${
           err.message || 'ver consola'
         }`
       );
-      console.error(err);
     } finally {
       setCreating(false);
     }
   }
 
-  // ==== Crear NOTA SOAP ====
+  // ==========================
+  //  Crear NOTA SOAP
+  // ==========================
   async function handleCrearNota(e) {
     e.preventDefault();
     setCreateNotaMsg('');
@@ -136,25 +136,31 @@ function App() {
 
     if (!token) {
       setCreateNotaMsg(
-        '❌ No hay token disponible. Debes iniciar sesión en el login primero.'
+        '⚠️ No hay token disponible. Debes iniciar sesión en el login primero.'
       );
       return;
     }
 
     if (!citaIdNota) {
-      setCreateNotaMsg('⚠️ Debes indicar el ID de la cita.');
+      setCreateNotaMsg(
+        '⚠️ Debes indicar el ID de la cita para registrar la nota SOAP.'
+      );
       return;
     }
 
     if (!S && !O && !A && !P) {
-      setCreateNotaMsg('⚠️ Escribe al menos un campo de la nota (S, O, A o P).');
+      setCreateNotaMsg(
+        '⚠️ Al menos uno de los campos S, O, A, P debe tener información.'
+      );
       return;
     }
 
     setCreatingNota(true);
     try {
+      // 👉 Ahora también usamos el API GATEWAY:
+      //    POST /citas/{id}/nota
       const resp = await fetch(
-        `${NOTAS_API_BASE}/citas/${encodeURIComponent(citaIdNota)}/nota`,
+        `${API_BASE}/citas/${encodeURIComponent(citaIdNota)}/nota`,
         {
           method: 'POST',
           headers: {
@@ -165,387 +171,386 @@ function App() {
         }
       );
 
-      const data = await resp.json();
-
       if (!resp.ok) {
+        const txt = await resp.text();
         setCreateNotaMsg(
-          `❌ Error al crear la nota SOAP: ${
-            data?.message || `HTTP ${resp.status}`
-          }`
+          `❌ Error al crear la nota SOAP (HTTP ${resp.status}): ${txt}`
         );
         return;
       }
 
-      setCreateNotaMsg('✅ Nota SOAP creada correctamente.');
+      const data = await resp.json();
       setCreatedNota(data);
+      setCreateNotaMsg('✅ Nota SOAP creada correctamente vía Gateway.');
     } catch (err) {
-      setCreateNotaMsg(
-        `❌ Error inesperado al crear la nota: ${err.message || 'ver consola'}`
-      );
       console.error(err);
+      setCreateNotaMsg(
+        `❌ Error inesperado al crear la nota: ${
+          err.message || 'ver consola'
+        }`
+      );
     } finally {
       setCreatingNota(false);
     }
   }
 
+  // ==========================
+  //  Render
+  // ==========================
   return (
     <div
       style={{
         minHeight: '100vh',
-        display: 'grid',
-        placeItems: 'center',
-        background: '#020617',
+        background:
+          'radial-gradient(circle at top, #111827 0, #020617 40%, #000 100%)',
         color: '#e5e7eb',
+        padding: '2rem',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'flex-start',
       }}
     >
       <div
         style={{
           width: '100%',
-          maxWidth: 900,
-          padding: 24,
-          borderRadius: 16,
-          background: '#0b1120',
-          border: '1px solid #1e293b',
-          boxShadow: '0 10px 24px rgba(0,0,0,.45)',
+          maxWidth: 960,
+          background: '#020617',
+          borderRadius: 24,
+          padding: '2rem',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+          border: '1px solid rgba(148,163,184,0.3)',
         }}
       >
-        <h1 style={{ marginTop: 0, marginBottom: 8, fontSize: 24 }}>
-          Portal Salud IPS
-        </h1>
-
-        <p style={{ marginBottom: 12, fontSize: 14 }}>{status}</p>
-
-        {token && (
-          <p
+        <header style={{ marginBottom: 24 }}>
+          <h1
             style={{
-              marginTop: 8,
-              marginBottom: 16,
-              fontSize: 12,
-              wordBreak: 'break-all',
-            }}
-          >
-            <strong>Token (vista parcial):</strong> {token.slice(0, 40)}...
-          </p>
-        )}
-
-        <hr style={{ borderColor: '#1e293b', margin: '16px 0' }} />
-
-        {/* ==== Sección Crear Cita ==== */}
-        <h2 style={{ fontSize: 18, marginBottom: 8 }}>Crear nueva cita</h2>
-        <p style={{ fontSize: 13, marginTop: 0, marginBottom: 12 }}>
-          Usa el mismo formato que probaste en Postman:{' '}
-          <code>medicoId</code>, <code>fechaHora</code> y <code>motivo</code>.
-        </p>
-
-        <form onSubmit={handleCrearCita}>
-          <div style={{ marginBottom: 10 }}>
-            <label
-              style={{
-                display: 'block',
-                fontSize: 14,
-                marginBottom: 4,
-              }}
-            >
-              ID del médico
-            </label>
-            <input
-              type="text"
-              value={medicoId}
-              onChange={(e) => setMedicoId(e.target.value)}
-              placeholder="medico-demo-1"
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                borderRadius: 8,
-                border: '1px solid #1f2937',
-                background: '#020617',
-                color: '#e5e7eb',
-              }}
-            />
-          </div>
-
-          <div style={{ marginBottom: 10 }}>
-            <label
-              style={{
-                display: 'block',
-                fontSize: 14,
-                marginBottom: 4,
-              }}
-            >
-              Fecha y hora
-            </label>
-            <input
-              type="datetime-local"
-              value={fechaHora}
-              onChange={(e) => setFechaHora(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                borderRadius: 8,
-                border: '1px solid #1f2937',
-                background: '#020617',
-                color: '#e5e7eb',
-              }}
-            />
-          </div>
-
-          <div style={{ marginBottom: 10 }}>
-            <label
-              style={{
-                display: 'block',
-                fontSize: 14,
-                marginBottom: 4,
-              }}
-            >
-              Motivo
-            </label>
-            <textarea
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-              rows={3}
-              placeholder="Control general, revisión, etc."
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                borderRadius: 8,
-                border: '1px solid #1f2937',
-                background: '#020617',
-                color: '#e5e7eb',
-                resize: 'vertical',
-              }}
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={creating || !token}
-            style={{
-              marginTop: 8,
-              padding: '10px 14px',
-              borderRadius: 10,
-              border: 'none',
-              background: !token ? '#4b5563' : '#22c55e',
-              color: '#0b1120',
+              fontSize: 28,
+              margin: 0,
               fontWeight: 600,
-              cursor: !token ? 'not-allowed' : 'pointer',
+              letterSpacing: 0.5,
             }}
           >
-            {creating ? 'Creando cita...' : 'Crear cita'}
-          </button>
-        </form>
-
-        {createMsg && (
-          <p
-            style={{
-              marginTop: 12,
-              fontSize: 14,
-            }}
-          >
-            {createMsg}
+            Portal Clínico - Salud IPS
+          </h1>
+          <p style={{ marginTop: 8, color: '#9ca3af' }}>
+            Este portal consume las APIs de Citas y Notas a través del{' '}
+            <strong>API Management</strong> (
+            <code>apigatewaysaludobri.azure-api.net</code>).
           </p>
-        )}
+        </header>
 
-        {createdCita && (
-          <pre
-            style={{
-              marginTop: 12,
-              fontSize: 12,
-              background: '#020617',
-              padding: 12,
-              borderRadius: 8,
-              border: '1px solid #1e293b',
-              overflowX: 'auto',
-            }}
-          >
-{JSON.stringify(createdCita, null, 2)}
-          </pre>
-        )}
-
-        <hr style={{ borderColor: '#1e293b', margin: '24px 0' }} />
-
-        {/* ==== Sección Crear Nota SOAP ==== */}
-        <h2 style={{ fontSize: 18, marginBottom: 8 }}>Crear nota SOAP</h2>
-        <p style={{ fontSize: 13, marginTop: 0, marginBottom: 12 }}>
-          Crea una nota SOAP asociada a una cita existente. Puedes usar el ID
-          de la última cita creada (se llena automáticamente arriba) o pegar
-          el ID de otra cita.
-        </p>
-
-        <form onSubmit={handleCrearNota}>
-          <div style={{ marginBottom: 10 }}>
-            <label
-              style={{
-                display: 'block',
-                fontSize: 14,
-                marginBottom: 4,
-              }}
-            >
-              ID de la cita
-            </label>
-            <input
-              type="text"
-              value={citaIdNota}
-              onChange={(e) => setCitaIdNota(e.target.value)}
-              placeholder="c1763..."
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                borderRadius: 8,
-                border: '1px solid #1f2937',
-                background: '#020617',
-                color: '#e5e7eb',
-              }}
-            />
-          </div>
-
+        <section
+          style={{
+            marginBottom: 24,
+            padding: '1rem',
+            borderRadius: 16,
+            background: 'rgba(15,23,42,0.9)',
+            border: '1px solid rgba(148,163,184,0.4)',
+          }}
+        >
           <div style={{ marginBottom: 8 }}>
-            <label
+            <strong>Estado del token:</strong>
+          </div>
+          <div style={{ color: '#e5e7eb' }}>{status}</div>
+          {token && (
+            <div
               style={{
-                display: 'block',
-                fontSize: 14,
-                marginBottom: 4,
+                marginTop: 8,
+                fontSize: 12,
+                color: '#9ca3af',
+                wordBreak: 'break-all',
               }}
             >
-              S – Subjectivo
-            </label>
-            <textarea
-              value={S}
-              onChange={(e) => setS(e.target.value)}
-              rows={2}
-              placeholder="Qué refiere el paciente..."
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                borderRadius: 8,
-                border: '1px solid #1f2937',
-                background: '#020617',
-                color: '#e5e7eb',
-              }}
-            />
-          </div>
+              <span style={{ fontWeight: 500 }}>Token (parcial): </span>
+              <code>{token.slice(0, 40)}...</code>
+            </div>
+          )}
+        </section>
 
-          <div style={{ marginBottom: 8 }}>
-            <label
-              style={{
-                display: 'block',
-                fontSize: 14,
-                marginBottom: 4,
-              }}
-            >
-              O – Objetivo
-            </label>
-            <textarea
-              value={O}
-              onChange={(e) => setO(e.target.value)}
-              rows={2}
-              placeholder="Signos vitales, hallazgos..."
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                borderRadius: 8,
-                border: '1px solid #1f2937',
-                background: '#020617',
-                color: '#e5e7eb',
-              }}
-            />
-          </div>
-
-          <div style={{ marginBottom: 8 }}>
-            <label
-              style={{
-                display: 'block',
-                fontSize: 14,
-                marginBottom: 4,
-              }}
-            >
-              A – Análisis
-            </label>
-            <textarea
-              value={A}
-              onChange={(e) => setA(e.target.value)}
-              rows={2}
-              placeholder="Impresión diagnóstica..."
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                borderRadius: 8,
-                border: '1px solid #1f2937',
-                background: '#020617',
-                color: '#e5e7eb',
-              }}
-            />
-          </div>
-
-          <div style={{ marginBottom: 8 }}>
-            <label
-              style={{
-                display: 'block',
-                fontSize: 14,
-                marginBottom: 4,
-              }}
-            >
-              P – Plan
-            </label>
-            <textarea
-              value={P}
-              onChange={(e) => setP(e.target.value)}
-              rows={2}
-              placeholder="Tratamiento, controles, educación..."
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                borderRadius: 8,
-                border: '1px solid #1f2937',
-                background: '#020617',
-                color: '#e5e7eb',
-              }}
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={creatingNota || !token}
-            style={{
-              marginTop: 8,
-              padding: '10px 14px',
-              borderRadius: 10,
-              border: 'none',
-              background: !token ? '#4b5563' : '#38bdf8',
-              color: '#0b1120',
-              fontWeight: 600,
-              cursor: !token ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {creatingNota ? 'Creando nota...' : 'Crear nota SOAP'}
-          </button>
-        </form>
-
-        {createNotaMsg && (
-          <p
-            style={{
-              marginTop: 12,
-              fontSize: 14,
-            }}
-          >
-            {createNotaMsg}
+        {/* =========================
+            FORMULARIO: CREAR CITA
+        ========================== */}
+        <section
+          style={{
+            marginBottom: 32,
+            padding: '1.5rem',
+            borderRadius: 16,
+            background: 'rgba(15,23,42,0.9)',
+            border: '1px solid rgba(148,163,184,0.4)',
+          }}
+        >
+          <h2 style={{ marginTop: 0, marginBottom: 12, fontSize: 20 }}>
+            1. Crear Cita
+          </h2>
+          <p style={{ marginTop: 0, color: '#9ca3af' }}>
+            Esta operación llama a <code>POST /citas</code> en el API Gateway.
           </p>
-        )}
 
-        {createdNota && (
-          <pre
-            style={{
-              marginTop: 12,
-              fontSize: 12,
-              background: '#020617',
-              padding: 12,
-              borderRadius: 8,
-              border: '1px solid #1e293b',
-              overflowX: 'auto',
-            }}
-          >
-{JSON.stringify(createdNota, null, 2)}
-          </pre>
-        )}
+          <form onSubmit={handleCrearCita}>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', marginBottom: 4 }}>
+                ID del médico
+              </label>
+              <input
+                type="text"
+                value={medicoId}
+                onChange={(e) => setMedicoId(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: 999,
+                  border: '1px solid #4b5563',
+                  background: '#020617',
+                  color: '#e5e7eb',
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', marginBottom: 4 }}>
+                Fecha y hora
+              </label>
+              <input
+                type="datetime-local"
+                value={fechaHora}
+                onChange={(e) => setFechaHora(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: 999,
+                  border: '1px solid #4b5563',
+                  background: '#020617',
+                  color: '#e5e7eb',
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', marginBottom: 4 }}>
+                Motivo de la cita
+              </label>
+              <textarea
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value)}
+                rows={3}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: 16,
+                  border: '1px solid #4b5563',
+                  background: '#020617',
+                  color: '#e5e7eb',
+                  resize: 'vertical',
+                }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={creating}
+              style={{
+                padding: '0.6rem 1.4rem',
+                borderRadius: 999,
+                border: 'none',
+                background:
+                  'linear-gradient(to right, #22c55e, #16a34a, #22c55e)',
+                color: '#0b1120',
+                fontWeight: 600,
+                cursor: creating ? 'wait' : 'pointer',
+              }}
+            >
+              {creating ? 'Creando cita...' : 'Crear cita'}
+            </button>
+          </form>
+
+          {createMsg && (
+            <div style={{ marginTop: 12, color: '#e5e7eb' }}>{createMsg}</div>
+          )}
+
+          {createdCita && (
+            <div
+              style={{
+                marginTop: 12,
+                fontSize: 12,
+                borderRadius: 12,
+                background: '#020617',
+                border: '1px solid #4b5563',
+                padding: '0.75rem',
+                maxHeight: 260,
+                overflow: 'auto',
+              }}
+            >
+              <div style={{ marginBottom: 4, color: '#9ca3af' }}>
+                Respuesta de la API (cita creada):
+              </div>
+              <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                {JSON.stringify(createdCita, null, 2)}
+              </pre>
+            </div>
+          )}
+        </section>
+
+        {/* =========================
+            FORMULARIO: NOTA SOAP
+        ========================== */}
+        <section
+          style={{
+            marginBottom: 8,
+            padding: '1.5rem',
+            borderRadius: 16,
+            background: 'rgba(15,23,42,0.9)',
+            border: '1px solid rgba(148,163,184,0.4)',
+          }}
+        >
+          <h2 style={{ marginTop: 0, marginBottom: 12, fontSize: 20 }}>
+            2. Registrar Nota SOAP
+          </h2>
+          <p style={{ marginTop: 0, color: '#9ca3af' }}>
+            Esta operación llama a{' '}
+            <code>POST /citas/&lt;id&gt;/nota</code> en el API Gateway.
+          </p>
+
+          <form onSubmit={handleCrearNota}>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', marginBottom: 4 }}>
+                ID de la cita
+              </label>
+              <input
+                type="text"
+                value={citaIdNota}
+                onChange={(e) => setCitaIdNota(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: 999,
+                  border: '1px solid #4b5563',
+                  background: '#020617',
+                  color: '#e5e7eb',
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: 4 }}>S (Subjetivo)</label>
+                <textarea
+                  value={S}
+                  onChange={(e) => setS(e.target.value)}
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: 16,
+                    border: '1px solid #4b5563',
+                    background: '#020617',
+                    color: '#e5e7eb',
+                    resize: 'vertical',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: 4 }}>O (Objetivo)</label>
+                <textarea
+                  value={O}
+                  onChange={(e) => setO(e.target.value)}
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: 16,
+                    border: '1px solid #4b5563',
+                    background: '#020617',
+                    color: '#e5e7eb',
+                    resize: 'vertical',
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr', marginTop: 12 }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: 4 }}>A (Análisis)</label>
+                <textarea
+                  value={A}
+                  onChange={(e) => setA(e.target.value)}
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: 16,
+                    border: '1px solid #4b5563',
+                    background: '#020617',
+                    color: '#e5e7eb',
+                    resize: 'vertical',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: 4 }}>P (Plan)</label>
+                <textarea
+                  value={P}
+                  onChange={(e) => setP(e.target.value)}
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: 16,
+                    border: '1px solid #4b5563',
+                    background: '#020617',
+                    color: '#e5e7eb',
+                    resize: 'vertical',
+                  }}
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={creatingNota}
+              style={{
+                marginTop: 16,
+                padding: '0.6rem 1.4rem',
+                borderRadius: 999,
+                border: 'none',
+                background:
+                  'linear-gradient(to right, #38bdf8, #0ea5e9, #38bdf8)',
+                color: '#0b1120',
+                fontWeight: 600,
+                cursor: creatingNota ? 'wait' : 'pointer',
+              }}
+            >
+              {creatingNota ? 'Registrando nota...' : 'Registrar nota SOAP'}
+            </button>
+          </form>
+
+          {createNotaMsg && (
+            <div style={{ marginTop: 12, color: '#e5e7eb' }}>
+              {createNotaMsg}
+            </div>
+          )}
+
+          {createdNota && (
+            <div
+              style={{
+                marginTop: 12,
+                fontSize: 12,
+                borderRadius: 12,
+                background: '#020617',
+                border: '1px solid #4b5563',
+                padding: '0.75rem',
+                maxHeight: 260,
+                overflow: 'auto',
+              }}
+            >
+              <div style={{ marginBottom: 4, color: '#9ca3af' }}>
+                Respuesta de la API (nota creada):
+              </div>
+              <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                {JSON.stringify(createdNota, null, 2)}
+              </pre>
+            </div>
+          )}
+        </section>
 
         <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 16 }}>
           El token se almacena solo en este dominio del portal (
