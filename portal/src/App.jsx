@@ -4,8 +4,8 @@ import './App.css';
 // ===============================
 //  API Gateway (API Management)
 // ===============================
-// Toda la comunicación del portal va a pasar por el API Gateway
-// Ajusta esta URL solo si cambias el dominio del APIM.
+// Toda la comunicación del portal va a pasar por el API Gateway.
+// Más adelante se puede mover a variables de entorno, por ahora lo dejamos fijo.
 const API_BASE = 'https://apigatewaysaludobri.azure-api.net';
 
 function App() {
@@ -84,7 +84,7 @@ function App() {
     try {
       const fechaISO = new Date(fechaHora).toISOString();
 
-      // 👉 Ahora usamos el API GATEWAY: POST /citas
+      // 👉 Usamos el API GATEWAY: POST /citas
       const resp = await fetch(`${API_BASE}/citas`, {
         method: 'POST',
         headers: {
@@ -157,8 +157,7 @@ function App() {
 
     setCreatingNota(true);
     try {
-      // 👉 Ahora también usamos el API GATEWAY:
-      //    POST /citas/{id}/nota
+      // 👉 API GATEWAY: POST /citas/{id}/nota
       const resp = await fetch(
         `${API_BASE}/citas/${encodeURIComponent(citaIdNota)}/nota`,
         {
@@ -192,6 +191,34 @@ function App() {
     } finally {
       setCreatingNota(false);
     }
+  }
+
+  // ==========================
+  //  Cerrar sesión (logout)
+  // ==========================
+  function handleLogout() {
+    // Borrar token del almacenamiento local del portal
+    localStorage.removeItem('portalAccessToken');
+
+    // Limpiar estado
+    setToken('');
+    setStatus(
+      '🔒 Sesión cerrada en el portal. Debes iniciar sesión de nuevo desde el login.'
+    );
+
+    // Limpiar formularios y resultados
+    setMedicoId('');
+    setFechaHora('');
+    setMotivo('');
+    setCitaIdNota('');
+    setS('');
+    setO('');
+    setA('');
+    setP('');
+    setCreatedCita(null);
+    setCreatedNota(null);
+    setCreateMsg('');
+    setCreateNotaMsg('');
   }
 
   // ==========================
@@ -239,6 +266,7 @@ function App() {
           </p>
         </header>
 
+        {/* Estado del token + botón Cerrar sesión */}
         <section
           style={{
             marginBottom: 24,
@@ -248,10 +276,39 @@ function App() {
             border: '1px solid rgba(148,163,184,0.4)',
           }}
         >
-          <div style={{ marginBottom: 8 }}>
-            <strong>Estado del token:</strong>
+          <div
+            style={{
+              marginBottom: 8,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <span>
+              <strong>Estado del token:</strong>
+            </span>
+
+            {token && (
+              <button
+                type="button"
+                onClick={handleLogout}
+                style={{
+                  padding: '0.3rem 0.9rem',
+                  borderRadius: 999,
+                  border: '1px solid #f97373',
+                  background: 'transparent',
+                  color: '#fecaca',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                Cerrar sesión
+              </button>
+            )}
           </div>
+
           <div style={{ color: '#e5e7eb' }}>{status}</div>
+
           {token && (
             <div
               style={{
@@ -347,7 +404,7 @@ function App() {
 
             <button
               type="submit"
-              disabled={creating}
+              disabled={creating || !token}
               style={{
                 padding: '0.6rem 1.4rem',
                 borderRadius: 999,
@@ -356,7 +413,8 @@ function App() {
                   'linear-gradient(to right, #22c55e, #16a34a, #22c55e)',
                 color: '#0b1120',
                 fontWeight: 600,
-                cursor: creating ? 'wait' : 'pointer',
+                cursor: creating || !token ? 'not-allowed' : 'pointer',
+                opacity: !token ? 0.6 : 1,
               }}
             >
               {creating ? 'Creando cita...' : 'Crear cita'}
@@ -430,9 +488,17 @@ function App() {
               />
             </div>
 
-            <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
+            <div
+              style={{
+                display: 'grid',
+                gap: 12,
+                gridTemplateColumns: '1fr 1fr',
+              }}
+            >
               <div>
-                <label style={{ display: 'block', marginBottom: 4 }}>S (Subjetivo)</label>
+                <label style={{ display: 'block', marginBottom: 4 }}>
+                  S (Subjetivo)
+                </label>
                 <textarea
                   value={S}
                   onChange={(e) => setS(e.target.value)}
@@ -449,7 +515,9 @@ function App() {
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: 4 }}>O (Objetivo)</label>
+                <label style={{ display: 'block', marginBottom: 4 }}>
+                  O (Objetivo)
+                </label>
                 <textarea
                   value={O}
                   onChange={(e) => setO(e.target.value)}
@@ -467,9 +535,18 @@ function App() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr', marginTop: 12 }}>
+            <div
+              style={{
+                display: 'grid',
+                gap: 12,
+                gridTemplateColumns: '1fr 1fr',
+                marginTop: 12,
+              }}
+            >
               <div>
-                <label style={{ display: 'block', marginBottom: 4 }}>A (Análisis)</label>
+                <label style={{ display: 'block', marginBottom: 4 }}>
+                  A (Análisis)
+                </label>
                 <textarea
                   value={A}
                   onChange={(e) => setA(e.target.value)}
@@ -486,7 +563,9 @@ function App() {
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: 4 }}>P (Plan)</label>
+                <label style={{ display: 'block', marginBottom: 4 }}>
+                  P (Plan)
+                </label>
                 <textarea
                   value={P}
                   onChange={(e) => setP(e.target.value)}
@@ -506,7 +585,7 @@ function App() {
 
             <button
               type="submit"
-              disabled={creatingNota}
+              disabled={creatingNota || !token}
               style={{
                 marginTop: 16,
                 padding: '0.6rem 1.4rem',
@@ -516,7 +595,8 @@ function App() {
                   'linear-gradient(to right, #38bdf8, #0ea5e9, #38bdf8)',
                 color: '#0b1120',
                 fontWeight: 600,
-                cursor: creatingNota ? 'wait' : 'pointer',
+                cursor: creatingNota || !token ? 'not-allowed' : 'pointer',
+                opacity: !token ? 0.6 : 1,
               }}
             >
               {creatingNota ? 'Registrando nota...' : 'Registrar nota SOAP'}
