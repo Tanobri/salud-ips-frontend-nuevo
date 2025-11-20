@@ -26,10 +26,19 @@ export async function api(path, init = {}) {
   return ct.includes('application/json') ? res.json() : res.text();
 }
 
-// Ejemplo: login (ajusta la ruta a la que exponga tu API Gateway)
+// Login (usa /auth/login de tu API)
 export function login(email, password) {
   return api('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
 }
+
+// 🔹 Registro (usa /auth/register de tu API)
+export function register({ email, password, rol, nombre }) {
+  return api('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ email, password, rol, nombre }),
+  });
+}
+
