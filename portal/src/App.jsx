@@ -6,7 +6,7 @@ import './App.css';
 // ===============================
 // Toda la comunicación del portal va a pasar por el API Gateway.
 // Más adelante se puede mover a variables de entorno, por ahora lo dejamos fijo.
-const API_BASE = 'https://apigatewaysaludobri.azure-api.net';
+const API_BASE = 'https://apigatewaysaludobri.azure-api.net/portal';
 
 function App() {
   const [token, setToken] = useState('');
