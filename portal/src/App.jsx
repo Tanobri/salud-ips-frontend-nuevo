@@ -6,7 +6,12 @@ import './App.css';
 // ===============================
 // Toda la comunicación del portal va a pasar por el API Gateway.
 // Más adelante se puede mover a variables de entorno, por ahora lo dejamos fijo.
+// API Gateway del portal
 const API_BASE = 'https://apigatewaysaludobri.azure-api.net/portal';
+
+// URL pública del FRONT de login-client (App Service de login)
+const LOGIN_URL = 'https://web-login-client-salud-ips.azurewebsites.net/';
+// 👆 reemplaza esto por la URL real de tu login-client
 
 function App() {
   const [token, setToken] = useState('');
@@ -196,30 +201,34 @@ function App() {
   // ==========================
   //  Cerrar sesión (logout)
   // ==========================
-  function handleLogout() {
-    // Borrar token del almacenamiento local del portal
-    localStorage.removeItem('portalAccessToken');
+function handleLogout() {
+  // Borrar token del almacenamiento local del portal
+  localStorage.removeItem('portalAccessToken');
 
-    // Limpiar estado
-    setToken('');
-    setStatus(
-      '🔒 Sesión cerrada en el portal. Debes iniciar sesión de nuevo desde el login.'
-    );
+  // (opcional) si más adelante guardas otras cosas, también las limpias aquí
 
-    // Limpiar formularios y resultados
-    setMedicoId('');
-    setFechaHora('');
-    setMotivo('');
-    setCitaIdNota('');
-    setS('');
-    setO('');
-    setA('');
-    setP('');
-    setCreatedCita(null);
-    setCreatedNota(null);
-    setCreateMsg('');
-    setCreateNotaMsg('');
-  }
+  // Limpiar estado en memoria
+  setToken('');
+  setStatus(
+    '🔒 Sesión cerrada en el portal. Debes iniciar sesión de nuevo desde el login.'
+  );
+
+  setMedicoId('');
+  setFechaHora('');
+  setMotivo('');
+  setCitaIdNota('');
+  setS('');
+  setO('');
+  setA('');
+  setP('');
+  setCreatedCita(null);
+  setCreatedNota(null);
+  setCreateMsg('');
+  setCreateNotaMsg('');
+
+  // 👉 Redirigir al frontend de login-client
+  window.location.href = LOGIN_URL;
+}
 
   // ==========================
   //  Render
