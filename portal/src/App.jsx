@@ -273,10 +273,13 @@ function handleLogout() {
   window.location.href = LOGIN_URL;
 }
 
+const canCrearCita = userRole === 'paciente' || userRole === 'admin';
+const canCrearNota = userRole === 'medico' || userRole === 'admin';
+
   // ==========================
   //  Render
   // ==========================
-  return (
+    return (
     <div
       style={{
         minHeight: '100vh',
@@ -316,6 +319,35 @@ function handleLogout() {
             <strong>API Management</strong> (
             <code>apigatewaysaludobri.azure-api.net</code>).
           </p>
+
+          {/* Banner de usuario y rol */}
+          {userName && (
+            <div
+              style={{
+                marginTop: 12,
+                padding: '0.75rem 1rem',
+                borderRadius: '0.75rem',
+                background: '#0f172a',
+                border: '1px solid #1e293b',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                fontSize: '0.9rem',
+              }}
+            >
+              <div>
+                <div>
+                  Sesión activa de: <strong>{userName}</strong>
+                </div>
+                <div style={{ opacity: 0.8 }}>
+                  Rol: <strong>{userRole || 'no definido'}</strong>
+                </div>
+              </div>
+              <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>
+                Token usado para consumir Citas y Notas.
+              </div>
+            </div>
+          )}
         </header>
 
         {/* Estado del token + botón Cerrar sesión */}
@@ -376,313 +408,342 @@ function handleLogout() {
           )}
         </section>
 
+        {/* Mensajes según rol (opcional, ayuda al usuario) */}
+        {userRole === 'paciente' && (
+          <p style={{ fontSize: 13, color: '#a5b4fc', marginTop: 0 }}>
+            Tu rol es <strong>paciente</strong>: puedes crear citas, pero no
+            registrar notas clínicas.
+          </p>
+        )}
+        {userRole === 'medico' && (
+          <p style={{ fontSize: 13, color: '#a5b4fc', marginTop: 0 }}>
+            Tu rol es <strong>médico</strong>: puedes registrar notas sobre
+            citas existentes, pero no crear nuevas citas.
+          </p>
+        )}
+        {userRole === 'admin' && (
+          <p style={{ fontSize: 13, color: '#a5b4fc', marginTop: 0 }}>
+            Tu rol es <strong>admin</strong>: tienes acceso tanto a la creación
+            de citas como al registro de notas.
+          </p>
+        )}
+
         {/* =========================
             FORMULARIO: CREAR CITA
+            (solo paciente / admin)
         ========================== */}
-        <section
-          style={{
-            marginBottom: 32,
-            padding: '1.5rem',
-            borderRadius: 16,
-            background: 'rgba(15,23,42,0.9)',
-            border: '1px solid rgba(148,163,184,0.4)',
-          }}
-        >
-          <h2 style={{ marginTop: 0, marginBottom: 12, fontSize: 20 }}>
-            1. Crear Cita
-          </h2>
-          <p style={{ marginTop: 0, color: '#9ca3af' }}>
-            Esta operación llama a <code>POST /citas</code> en el API Gateway.
-          </p>
+        {canCrearCita && (
+          <section
+            style={{
+              marginTop: 16,
+              marginBottom: 32,
+              padding: '1.5rem',
+              borderRadius: 16,
+              background: 'rgba(15,23,42,0.9)',
+              border: '1px solid rgba(148,163,184,0.4)',
+            }}
+          >
+            <h2 style={{ marginTop: 0, marginBottom: 12, fontSize: 20 }}>
+              1. Crear Cita
+            </h2>
+            <p style={{ marginTop: 0, color: '#9ca3af' }}>
+              Esta operación llama a <code>POST /citas</code> en el API Gateway.
+            </p>
 
-          <form onSubmit={handleCrearCita}>
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', marginBottom: 4 }}>
-                ID del médico
-              </label>
-              <input
-                type="text"
-                value={medicoId}
-                onChange={(e) => setMedicoId(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: 999,
-                  border: '1px solid #4b5563',
-                  background: '#020617',
-                  color: '#e5e7eb',
-                }}
-              />
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', marginBottom: 4 }}>
-                Fecha y hora
-              </label>
-              <input
-                type="datetime-local"
-                value={fechaHora}
-                onChange={(e) => setFechaHora(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: 999,
-                  border: '1px solid #4b5563',
-                  background: '#020617',
-                  color: '#e5e7eb',
-                }}
-              />
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', marginBottom: 4 }}>
-                Motivo de la cita
-              </label>
-              <textarea
-                value={motivo}
-                onChange={(e) => setMotivo(e.target.value)}
-                rows={3}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: 16,
-                  border: '1px solid #4b5563',
-                  background: '#020617',
-                  color: '#e5e7eb',
-                  resize: 'vertical',
-                }}
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={creating || !token}
-              style={{
-                padding: '0.6rem 1.4rem',
-                borderRadius: 999,
-                border: 'none',
-                background:
-                  'linear-gradient(to right, #22c55e, #16a34a, #22c55e)',
-                color: '#0b1120',
-                fontWeight: 600,
-                cursor: creating || !token ? 'not-allowed' : 'pointer',
-                opacity: !token ? 0.6 : 1,
-              }}
-            >
-              {creating ? 'Creando cita...' : 'Crear cita'}
-            </button>
-          </form>
-
-          {createMsg && (
-            <div style={{ marginTop: 12, color: '#e5e7eb' }}>{createMsg}</div>
-          )}
-
-          {createdCita && (
-            <div
-              style={{
-                marginTop: 12,
-                fontSize: 12,
-                borderRadius: 12,
-                background: '#020617',
-                border: '1px solid #4b5563',
-                padding: '0.75rem',
-                maxHeight: 260,
-                overflow: 'auto',
-              }}
-            >
-              <div style={{ marginBottom: 4, color: '#9ca3af' }}>
-                Respuesta de la API (cita creada):
+            <form onSubmit={handleCrearCita}>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: 'block', marginBottom: 4 }}>
+                  ID del médico
+                </label>
+                <input
+                  type="text"
+                  value={medicoId}
+                  onChange={(e) => setMedicoId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 0.75rem',
+                    borderRadius: 999,
+                    border: '1px solid #4b5563',
+                    background: '#020617',
+                    color: '#e5e7eb',
+                  }}
+                />
               </div>
-              <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                {JSON.stringify(createdCita, null, 2)}
-              </pre>
-            </div>
-          )}
-        </section>
+
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: 'block', marginBottom: 4 }}>
+                  Fecha y hora
+                </label>
+                <input
+                  type="datetime-local"
+                  value={fechaHora}
+                  onChange={(e) => setFechaHora(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 0.75rem',
+                    borderRadius: 999,
+                    border: '1px solid #4b5563',
+                    background: '#020617',
+                    color: '#e5e7eb',
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: 'block', marginBottom: 4 }}>
+                  Motivo de la cita
+                </label>
+                <textarea
+                  value={motivo}
+                  onChange={(e) => setMotivo(e.target.value)}
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: 16,
+                    border: '1px solid #4b5563',
+                    background: '#020617',
+                    color: '#e5e7eb',
+                    resize: 'vertical',
+                  }}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={creating || !token}
+                style={{
+                  padding: '0.6rem 1.4rem',
+                  borderRadius: 999,
+                  border: 'none',
+                  background:
+                    'linear-gradient(to right, #22c55e, #16a34a, #22c55e)',
+                  color: '#0b1120',
+                  fontWeight: 600,
+                  cursor: creating || !token ? 'not-allowed' : 'pointer',
+                  opacity: !token ? 0.6 : 1,
+                }}
+              >
+                {creating ? 'Creando cita...' : 'Crear cita'}
+              </button>
+            </form>
+
+            {createMsg && (
+              <div style={{ marginTop: 12, color: '#e5e7eb' }}>
+                {createMsg}
+              </div>
+            )}
+
+            {createdCita && (
+              <div
+                style={{
+                  marginTop: 12,
+                  fontSize: 12,
+                  borderRadius: 12,
+                  background: '#020617',
+                  border: '1px solid #4b5563',
+                  padding: '0.75rem',
+                  maxHeight: 260,
+                  overflow: 'auto',
+                }}
+              >
+                <div style={{ marginBottom: 4, color: '#9ca3af' }}>
+                  Respuesta de la API (cita creada):
+                </div>
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                  {JSON.stringify(createdCita, null, 2)}
+                </pre>
+              </div>
+            )}
+          </section>
+        )}
 
         {/* =========================
             FORMULARIO: NOTA SOAP
+            (solo médico / admin)
         ========================== */}
-        <section
-          style={{
-            marginBottom: 8,
-            padding: '1.5rem',
-            borderRadius: 16,
-            background: 'rgba(15,23,42,0.9)',
-            border: '1px solid rgba(148,163,184,0.4)',
-          }}
-        >
-          <h2 style={{ marginTop: 0, marginBottom: 12, fontSize: 20 }}>
-            2. Registrar Nota SOAP
-          </h2>
-          <p style={{ marginTop: 0, color: '#9ca3af' }}>
-            Esta operación llama a{' '}
-            <code>POST /citas/&lt;id&gt;/nota</code> en el API Gateway.
-          </p>
+        {canCrearNota && (
+          <section
+            style={{
+              marginBottom: 8,
+              padding: '1.5rem',
+              borderRadius: 16,
+              background: 'rgba(15,23,42,0.9)',
+              border: '1px solid rgba(148,163,184,0.4)',
+            }}
+          >
+            <h2 style={{ marginTop: 0, marginBottom: 12, fontSize: 20 }}>
+              2. Registrar Nota SOAP
+            </h2>
+            <p style={{ marginTop: 0, color: '#9ca3af' }}>
+              Esta operación llama a{' '}
+              <code>POST /citas/&lt;id&gt;/nota</code> en el API Gateway.
+            </p>
 
-          <form onSubmit={handleCrearNota}>
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', marginBottom: 4 }}>
-                ID de la cita
-              </label>
-              <input
-                type="text"
-                value={citaIdNota}
-                onChange={(e) => setCitaIdNota(e.target.value)}
+            <form onSubmit={handleCrearNota}>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: 'block', marginBottom: 4 }}>
+                  ID de la cita
+                </label>
+                <input
+                  type="text"
+                  value={citaIdNota}
+                  onChange={(e) => setCitaIdNota(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 0.75rem',
+                    borderRadius: 999,
+                    border: '1px solid #4b5563',
+                    background: '#020617',
+                    color: '#e5e7eb',
+                  }}
+                />
+              </div>
+
+              <div
                 style={{
-                  width: '100%',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: 999,
-                  border: '1px solid #4b5563',
-                  background: '#020617',
-                  color: '#e5e7eb',
+                  display: 'grid',
+                  gap: 12,
+                  gridTemplateColumns: '1fr 1fr',
                 }}
-              />
-            </div>
-
-            <div
-              style={{
-                display: 'grid',
-                gap: 12,
-                gridTemplateColumns: '1fr 1fr',
-              }}
-            >
-              <div>
-                <label style={{ display: 'block', marginBottom: 4 }}>
-                  S (Subjetivo)
-                </label>
-                <textarea
-                  value={S}
-                  onChange={(e) => setS(e.target.value)}
-                  rows={3}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: 16,
-                    border: '1px solid #4b5563',
-                    background: '#020617',
-                    color: '#e5e7eb',
-                    resize: 'vertical',
-                  }}
-                />
+              >
+                <div>
+                  <label style={{ display: 'block', marginBottom: 4 }}>
+                    S (Subjetivo)
+                  </label>
+                  <textarea
+                    value={S}
+                    onChange={(e) => setS(e.target.value)}
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: 16,
+                      border: '1px solid #4b5563',
+                      background: '#020617',
+                      color: '#e5e7eb',
+                      resize: 'vertical',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 4 }}>
+                    O (Objetivo)
+                  </label>
+                  <textarea
+                    value={O}
+                    onChange={(e) => setO(e.target.value)}
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: 16,
+                      border: '1px solid #4b5563',
+                      background: '#020617',
+                      color: '#e5e7eb',
+                      resize: 'vertical',
+                    }}
+                  />
+                </div>
               </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: 4 }}>
-                  O (Objetivo)
-                </label>
-                <textarea
-                  value={O}
-                  onChange={(e) => setO(e.target.value)}
-                  rows={3}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: 16,
-                    border: '1px solid #4b5563',
-                    background: '#020617',
-                    color: '#e5e7eb',
-                    resize: 'vertical',
-                  }}
-                />
-              </div>
-            </div>
 
-            <div
-              style={{
-                display: 'grid',
-                gap: 12,
-                gridTemplateColumns: '1fr 1fr',
-                marginTop: 12,
-              }}
-            >
-              <div>
-                <label style={{ display: 'block', marginBottom: 4 }}>
-                  A (Análisis)
-                </label>
-                <textarea
-                  value={A}
-                  onChange={(e) => setA(e.target.value)}
-                  rows={3}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: 16,
-                    border: '1px solid #4b5563',
-                    background: '#020617',
-                    color: '#e5e7eb',
-                    resize: 'vertical',
-                  }}
-                />
+              <div
+                style={{
+                  display: 'grid',
+                  gap: 12,
+                  gridTemplateColumns: '1fr 1fr',
+                  marginTop: 12,
+                }}
+              >
+                <div>
+                  <label style={{ display: 'block', marginBottom: 4 }}>
+                    A (Análisis)
+                  </label>
+                  <textarea
+                    value={A}
+                    onChange={(e) => setA(e.target.value)}
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: 16,
+                      border: '1px solid #4b5563',
+                      background: '#020617',
+                      color: '#e5e7eb',
+                      resize: 'vertical',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 4 }}>
+                    P (Plan)
+                  </label>
+                  <textarea
+                    value={P}
+                    onChange={(e) => setP(e.target.value)}
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: 16,
+                      border: '1px solid #4b5563',
+                      background: '#020617',
+                      color: '#e5e7eb',
+                      resize: 'vertical',
+                    }}
+                  />
+                </div>
               </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: 4 }}>
-                  P (Plan)
-                </label>
-                <textarea
-                  value={P}
-                  onChange={(e) => setP(e.target.value)}
-                  rows={3}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: 16,
-                    border: '1px solid #4b5563',
-                    background: '#020617',
-                    color: '#e5e7eb',
-                    resize: 'vertical',
-                  }}
-                />
+
+              <button
+                type="submit"
+                disabled={creatingNota || !token}
+                style={{
+                  marginTop: 16,
+                  padding: '0.6rem 1.4rem',
+                  borderRadius: 999,
+                  border: 'none',
+                  background:
+                    'linear-gradient(to right, #38bdf8, #0ea5e9, #38bdf8)',
+                  color: '#0b1120',
+                  fontWeight: 600,
+                  cursor: creatingNota || !token ? 'not-allowed' : 'pointer',
+                  opacity: !token ? 0.6 : 1,
+                }}
+              >
+                {creatingNota ? 'Registrando nota...' : 'Registrar nota SOAP'}
+              </button>
+            </form>
+
+            {createNotaMsg && (
+              <div style={{ marginTop: 12, color: '#e5e7eb' }}>
+                {createNotaMsg}
               </div>
-            </div>
+            )}
 
-            <button
-              type="submit"
-              disabled={creatingNota || !token}
-              style={{
-                marginTop: 16,
-                padding: '0.6rem 1.4rem',
-                borderRadius: 999,
-                border: 'none',
-                background:
-                  'linear-gradient(to right, #38bdf8, #0ea5e9, #38bdf8)',
-                color: '#0b1120',
-                fontWeight: 600,
-                cursor: creatingNota || !token ? 'not-allowed' : 'pointer',
-                opacity: !token ? 0.6 : 1,
-              }}
-            >
-              {creatingNota ? 'Registrando nota...' : 'Registrar nota SOAP'}
-            </button>
-          </form>
-
-          {createNotaMsg && (
-            <div style={{ marginTop: 12, color: '#e5e7eb' }}>
-              {createNotaMsg}
-            </div>
-          )}
-
-          {createdNota && (
-            <div
-              style={{
-                marginTop: 12,
-                fontSize: 12,
-                borderRadius: 12,
-                background: '#020617',
-                border: '1px solid #4b5563',
-                padding: '0.75rem',
-                maxHeight: 260,
-                overflow: 'auto',
-              }}
-            >
-              <div style={{ marginBottom: 4, color: '#9ca3af' }}>
-                Respuesta de la API (nota creada):
+            {createdNota && (
+              <div
+                style={{
+                  marginTop: 12,
+                  fontSize: 12,
+                  borderRadius: 12,
+                  background: '#020617',
+                  border: '1px solid #4b5563',
+                  padding: '0.75rem',
+                  maxHeight: 260,
+                  overflow: 'auto',
+                }}
+              >
+                <div style={{ marginBottom: 4, color: '#9ca3af' }}>
+                  Respuesta de la API (nota creada):
+                </div>
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                  {JSON.stringify(createdNota, null, 2)}
+                </pre>
               </div>
-              <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                {JSON.stringify(createdNota, null, 2)}
-              </pre>
-            </div>
-          )}
-        </section>
+            )}
+          </section>
+        )}
 
         <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 16 }}>
           El token se almacena solo en este dominio del portal (
@@ -693,5 +754,6 @@ function handleLogout() {
     </div>
   );
 }
+
 
 export default App;
