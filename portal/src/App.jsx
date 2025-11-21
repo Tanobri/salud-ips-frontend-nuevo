@@ -280,18 +280,18 @@ const canCrearNota = userRole === 'medico' || userRole === 'admin';
   //  Render
   // ==========================
     return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background:
-          'radial-gradient(circle at top, #111827 0, #020617 40%, #000 100%)',
-        color: '#e5e7eb',
-        padding: '2rem',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'flex-start',
-      }}
-    >
+<div
+  style={{
+    width: '100%',
+    maxWidth: 960,
+    background: '#020617',
+    borderRadius: 24,
+    padding: '2rem',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+    border: '1px solid rgba(148,163,184,0.3)',
+  }}
+>
+
       <div
         style={{
           width: '100%',
