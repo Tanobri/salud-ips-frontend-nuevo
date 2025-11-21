@@ -38,32 +38,33 @@ function App() {
   // ================================
   //  Manejo del token (URL + localStorage)
   // ================================
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    const fromQuery = url.searchParams.get('token');
+useEffect(() => {
+  const url = new URL(window.location.href);
+  const fromQuery = url.searchParams.get('token');
 
-    if (fromQuery) {
-      // 1) Token recibido desde el login via ?token=
-      setToken(fromQuery);
-      setStatus('🔓 Token recibido desde el login y almacenado.');
-      localStorage.setItem('portalAccessToken', fromQuery);
+  if (fromQuery) {
+    // 1) Token recibido desde el login via ?token=
+    setToken(fromQuery);
+    setStatus('🔓 Token recibido desde el login y almacenado.');
+    localStorage.setItem('portalAccessToken', fromQuery);
 
-      // 2) Limpiar la URL para que no quede el token visible
-      url.searchParams.delete('token');
-      window.history.replaceState({}, '', url.toString());
+    // Limpiar el token de la URL
+    url.searchParams.delete('token');
+    window.history.replaceState({}, '', url.toString());
+  } else {
+    // 2) Intentar cargar token desde localStorage
+    const stored = localStorage.getItem('portalAccessToken');
+    if (stored) {
+      setToken(stored);
+      setStatus('🔐 Token cargado desde el almacenamiento local.');
     } else {
-      // 3) Intentar cargar token desde localStorage
-      const stored = localStorage.getItem('portalAccessToken');
-      if (stored) {
-        setToken(stored);
-        setStatus('🔐 Token cargado desde el almacenamiento local.');
-      } else {
-        setStatus(
-          '⚠️ No se encontró token. Inicia sesión primero en el login y deja que te redirija al portal.'
-        );
-      }
+      // 3) Sin token → redirigir al login-client
+      setStatus('🔒 No hay token. Redirigiendo al login…');
+      window.location.href = LOGIN_URL;
     }
-  }, []);
+  }
+}, []);
+
 
   // ==========================
   //  Crear CITA
