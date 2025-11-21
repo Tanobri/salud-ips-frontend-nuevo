@@ -75,14 +75,16 @@ export default function App() {
   const isLogin = mode === 'login';
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'grid',
-        placeItems: 'center',
-        background: '#0b1020',
-        color: '#e2e8f0',
-      }}
+  <div
+    style={{
+      width: '100%',
+      maxWidth: 420,
+      background: '#020617',
+      borderRadius: 24,
+      padding: '2rem',
+      boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+      border: '1px solid rgba(148,163,184,0.3)',
+    }}
     >
       <form
         onSubmit={onSubmit}
