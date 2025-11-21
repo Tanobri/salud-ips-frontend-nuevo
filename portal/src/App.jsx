@@ -12,11 +12,32 @@ const API_BASE = 'https://apigatewaysaludobri.azure-api.net/portal';
 // URL pública del FRONT de login-client (App Service de login)
 const LOGIN_URL = 'https://web-login-client-salud-ips.azurewebsites.net/';
 // 👆 reemplaza esto por la URL real de tu login-client
+// Helper para leer el contenido del JWT (sin validar firma)
+function parseJwt(token) {
+  try {
+    const base64Url = token.split('.')[1]; // segunda parte del JWT
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error('No se pudo decodificar el token:', e);
+    return null;
+  }
+}
 
 function App() {
   const [token, setToken] = useState('');
   const [status, setStatus] = useState('');
-
+  const [userRole, setUserRole] = useState('');
+  const [userName, setUserName] = useState('');
+ 
   // ==== Estados del formulario de creación de cita ====
   const [medicoId, setMedicoId] = useState('');
   const [fechaHora, setFechaHora] = useState('');
@@ -42,28 +63,49 @@ useEffect(() => {
   const url = new URL(window.location.href);
   const fromQuery = url.searchParams.get('token');
 
-  if (fromQuery) {
-    // 1) Token recibido desde el login via ?token=
-    setToken(fromQuery);
-    setStatus('🔓 Token recibido desde el login y almacenado.');
-    localStorage.setItem('portalAccessToken', fromQuery);
+  // función auxiliar para no repetir código
+  const hydrateFromToken = (tok, sourceMsg) => {
+    setToken(tok);
+    setStatus(sourceMsg);
 
-    // Limpiar el token de la URL
+    const payload = parseJwt(tok);
+    if (payload) {
+      setUserRole(payload.rol || '');
+      setUserName(payload.nombre || '');
+      console.log('Payload del token en portal:', payload);
+    } else {
+      setUserRole('');
+      setUserName('');
+    }
+  };
+
+  if (fromQuery) {
+    // 1) Token recibido desde el login vía ?token=...
+    localStorage.setItem('portalAccessToken', fromQuery);
+    hydrateFromToken(
+      fromQuery,
+      '🔓 Token recibido desde el login y almacenado.'
+    );
+
+    // limpiar el token de la URL
     url.searchParams.delete('token');
     window.history.replaceState({}, '', url.toString());
   } else {
-    // 2) Intentar cargar token desde localStorage
+    // 2) Intentar cargar desde localStorage
     const stored = localStorage.getItem('portalAccessToken');
     if (stored) {
-      setToken(stored);
-      setStatus('🔐 Token cargado desde el almacenamiento local.');
+      hydrateFromToken(
+        stored,
+        '🔐 Token cargado desde el almacenamiento local.'
+      );
     } else {
-      // 3) Sin token → redirigir al login-client
+      // 3) Sin token → redirigir al login
       setStatus('🔒 No hay token. Redirigiendo al login…');
       window.location.href = LOGIN_URL;
     }
   }
 }, []);
+
 
 
   // ==========================
